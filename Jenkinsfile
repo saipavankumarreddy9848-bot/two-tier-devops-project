@@ -16,7 +16,7 @@ pipeline {
                     python3 -m venv .venv
                     . .venv/bin/activate
                     pip install --upgrade pip
-                    pip install -r app/requirement.txt pytest
+                    pip install -r app/requirements.txt pytest
                     python -m pytest -v
                 '''
             }
