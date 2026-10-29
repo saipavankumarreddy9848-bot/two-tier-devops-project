@@ -1,10 +1,11 @@
+
 pipeline {
     agent any
 
     stages {
         stage('Checkout') {
             steps {
-                echo 'Source code was checked out by Jenkins.'
+                echo 'Source code checked out by Jenkins.'
                 sh 'git status --short --branch'
             }
         }
@@ -24,23 +25,30 @@ pipeline {
 
         stage('Build Docker Images') {
             steps {
-                sh 'sudo docker compose build'
+                sh '''
+                    cd /opt/two-tier-devops-project
+                    docker compose build
+                '''
             }
         }
 
         stage('Deploy Application') {
             steps {
-                sh 'sudo docker compose up -d'
+                sh '''
+                    cd /opt/two-tier-devops-project
+                    docker compose up -d
+                '''
             }
         }
 
         stage('Verify Deployment') {
             steps {
                 sh '''
+                    set -e
                     sleep 10
-                    curl --fail http://127.0.0.1:5000/health
+                    curl --fail --show-error http://127.0.0.1:5000/health
                     echo
-                    curl --fail http://127.0.0.1:5000/db-health
+                    curl --fail --show-error http://127.0.0.1:5000/db-health
                     echo
                 '''
             }
