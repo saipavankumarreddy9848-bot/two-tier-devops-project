@@ -6,6 +6,14 @@ from db import get_db_connection
 app = Flask(__name__)
 
 
+# Security note:
+# This application is designed as a stateless REST API.
+# It does not use cookie-based authentication or session-based
+# authorization. Therefore, browser-automatically-attached
+# authentication credentials are not used, and CSRF protection
+# is not required for the current authentication design.
+
+
 @app.get("/health")
 def health():
     return jsonify({"status": "healthy"}), 200

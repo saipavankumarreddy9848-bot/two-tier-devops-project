@@ -7,7 +7,7 @@ WORKDIR /app
 
 COPY app/requirements.txt .
 
-RUN pip install --no-cache-dir --require-hashes -r requirements.txt
+RUN pip install --no-cache-dir --require-hashes --only-binary=:all: -r requirements.txt
 
 COPY app/ .
 
