@@ -17,7 +17,8 @@ pipeline {
                     python3 -m venv .venv
                     . .venv/bin/activate
                     pip install --upgrade pip
-                    pip install -r app/requirements.txt pytest
+                    pip install pytest==8.4.2
+                    pip install -r app/requirements.txt
                     python -m pytest -v
                 '''
             }
