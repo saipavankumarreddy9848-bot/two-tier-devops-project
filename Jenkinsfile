@@ -14,7 +14,7 @@ pipeline {
             steps {
                 sh '''
                     set -e
-                    python3 -m venv .venv
+                    python3.12 -m venv .venv
                     . .venv/bin/activate
                     pip install --upgrade pip
                     pip install pytest==8.4.2
