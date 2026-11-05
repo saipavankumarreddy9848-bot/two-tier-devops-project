@@ -10,6 +10,7 @@ pipeline {
     environment {
         APP_NAME = 'two-tier-devops-project'
         COMPOSE_FILE = 'docker-compose.yml'
+        COMPOSE_PROJECT_NAME = 'two-tier-devops-project'
     }
 
     stages {
@@ -29,20 +30,21 @@ pipeline {
                     echo "Checking Python version..."
                     python3.12 --version
 
-                    echo "Creating virtual environment..."
+                    echo "Creating Python 3.12 virtual environment..."
+                    rm -rf .venv
                     python3.12 -m venv .venv
 
-                    echo "Activating virtual environment..."
-                    . .venv/bin/activate
-
                     echo "Upgrading pip..."
-                    python -m pip install --upgrade pip
+                    .venv/bin/python -m pip install --upgrade pip
 
                     echo "Installing pytest..."
-                    python -m pip install pytest==8.4.2
+                    .venv/bin/python -m pip install pytest==8.4.2
 
                     echo "Installing application dependencies..."
-                    python -m pip install -r app/requirements.txt
+                    .venv/bin/python -m pip install -r app/requirements.txt
+
+                    echo "Verifying Python version..."
+                    .venv/bin/python --version
 
                     echo "Running application tests..."
                     .venv/bin/python -m pytest -v
@@ -55,8 +57,13 @@ pipeline {
                 sh '''
                     set -e
 
+                    echo "Checking Docker version..."
+                    docker --version
+                    docker compose version
+
                     echo "Building Docker images..."
-                    docker compose -f ${COMPOSE_FILE} build
+                    docker compose -p ${COMPOSE_PROJECT_NAME} \
+                        -f ${COMPOSE_FILE} build
                 '''
             }
         }
@@ -68,16 +75,25 @@ pipeline {
 
                     echo "Checking environment configuration..."
 
-                    if [ ! -f .env ]; then
-                        echo "ERROR: .env file is missing."
+                    if [ ! -f /opt/two-tier-devops-project/.env ]; then
+                        echo "ERROR: Deployment .env file is missing."
                         exit 1
                     fi
 
                     echo "Deploying application..."
-                    docker compose -f ${COMPOSE_FILE} up -d
+
+                    docker compose \
+                        --env-file /opt/two-tier-devops-project/.env \
+                        -p ${COMPOSE_PROJECT_NAME} \
+                        -f ${WORKSPACE}/${COMPOSE_FILE} \
+                        up -d
 
                     echo "Checking running containers..."
-                    docker compose -f ${COMPOSE_FILE} ps
+                    docker compose \
+                        --env-file /opt/two-tier-devops-project/.env \
+                        -p ${COMPOSE_PROJECT_NAME} \
+                        -f ${WORKSPACE}/${COMPOSE_FILE} \
+                        ps
                 '''
             }
         }
@@ -91,13 +107,17 @@ pipeline {
                     sleep 10
 
                     echo "Checking application health..."
+
                     curl --fail --retry 5 --retry-delay 5 \
+                        --retry-connrefused \
                         http://localhost:5000/health
 
                     echo ""
 
                     echo "Checking database health..."
-                    curl --fail \
+
+                    curl --fail --retry 5 --retry-delay 5 \
+                        --retry-connrefused \
                         http://localhost:5000/db-health
 
                     echo ""
