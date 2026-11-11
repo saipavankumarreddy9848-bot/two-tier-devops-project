@@ -108,7 +108,7 @@ pipeline {
                         --env-file "$ENV_FILE" \
                         -p "$COMPOSE_PROJECT_NAME" \
                         -f "$WORKSPACE/$COMPOSE_FILE" \
-                        up -d build
+                        up -d
 
                     echo "Checking running containers..."
 
