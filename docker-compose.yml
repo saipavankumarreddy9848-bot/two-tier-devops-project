@@ -1,6 +1,7 @@
 
 services:
   app:
+    image: ${APP_IMAGE:-two-tier-devops-project-app:latest}
     build:
       context: .
       dockerfile: Dockerfile
