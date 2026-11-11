@@ -146,11 +146,69 @@ pipeline {
             steps {
                 sh '''
                     set -e
+		    echo "Waiting for application and database containers..."
 
-                    echo "Waiting for application startup..."
-                    sleep 10
+	            APP_CONTAINER=""
+        	    DB_CONTAINER=""
 
-                    echo "Checking application health..."
+                    for i in $(seq 1 12); do
+
+                	APP_CONTAINER=$(docker compose \
+                    	    --env-file "$ENV_FILE" \
+                    	    -p "$COMPOSE_PROJECT_NAME" \
+      	                    -f "$WORKSPACE/$COMPOSE_FILE" \
+             	            ps -q app)
+
+                	DB_CONTAINER=$(docker compose \
+                    	    --env-file "$ENV_FILE" \
+                   	    -p "$COMPOSE_PROJECT_NAME" \
+                    	    -f "$WORKSPACE/$COMPOSE_FILE" \
+                    	    ps -q db)
+
+                	if [ -n "$APP_CONTAINER" ] && [ -n "$DB_CONTAINER" ]; then
+
+                    	    APP_STATUS=$(docker inspect \
+                        	--format '{{.State.Health.Status}}' "$APP_CONTAINER")
+
+                   	    DB_STATUS=$(docker inspect \
+                                --format '{{.State.Health.Status}}' "$DB_CONTAINER")
+
+                            echo "Application status: $APP_STATUS"
+                    	    echo "Database status: $DB_STATUS"
+
+                    	    if [ "$APP_STATUS" = "healthy" ] && \
+                       	       [ "$DB_STATUS" = "healthy" ]; then
+                        	break
+                    	    fi
+                	fi
+
+                	if [ "$i" -eq 12 ]; then
+                    	    echo "ERROR: Containers did not become healthy."
+
+                    	    docker compose \
+                        	--env-file "$ENV_FILE" \
+                        	-p "$COMPOSE_PROJECT_NAME" \
+                        	-f "$WORKSPACE/$COMPOSE_FILE" \
+                        	ps
+
+                    	    docker compose \
+                        	--env-file "$ENV_FILE" \
+                        	-p "$COMPOSE_PROJECT_NAME" \
+                        	-f "$WORKSPACE/$COMPOSE_FILE" \
+                        	logs --tail=50 app db
+
+                    	    exit 1
+                	fi
+
+                	sleep 5
+            	   
+		    done
+
+
+                    echo "Both containers are healthy."
+                    
+
+                    echo "Checking application health endpoint..."
 
                     curl --fail \
                         --retry 5 \
@@ -160,7 +218,7 @@ pipeline {
 
                     echo ""
 
-                    echo "Checking database health..."
+                    echo "Checking database connectivity endpoint..."
 
                     curl --fail \
                         --retry 5 \
@@ -169,6 +227,7 @@ pipeline {
                         http://localhost:5000/db-health
 
                     echo ""
+
                     echo "Deployment verification successful."
                 '''
             }
