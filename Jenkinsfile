@@ -52,7 +52,29 @@ pipeline {
 
                     echo "Running application tests..."
                     .venv/bin/python -m pytest -v
+
+                    echo "All Python tests completed successfully."
                 '''
+            }
+        }
+
+        stage('SonarQube Analysis') {
+            steps {
+                script {
+                    def scannerHome = tool 'SonarScanner'
+
+                    withSonarQubeEnv('SonarCloud') {
+                        sh """
+                            set -e
+
+                            echo "Starting SonarQube Cloud analysis..."
+
+                            ${scannerHome}/bin/sonar-scanner
+
+                            echo "SonarQube analysis completed."
+                        """
+                    }
+                }
             }
         }
 
@@ -62,7 +84,6 @@ pipeline {
                     set -e
 
                     echo "Checking environment file..."
-
 
                     if [ ! -f "$ENV_FILE" ]; then
                         echo "ERROR: Jenkins cannot read the environment file."
@@ -78,14 +99,14 @@ pipeline {
                         config --quiet
 
                     echo "Building Docker images..."
-		    
-		    docker compose \
-                        --env-file "$ENV_FILE" \
-       		        -p "$COMPOSE_PROJECT_NAME" \
-                	-f "$WORKSPACE/$COMPOSE_FILE" \
-                	build
-		    echo "Docker image build completed."
 
+                    docker compose \
+                        --env-file "$ENV_FILE" \
+                        -p "$COMPOSE_PROJECT_NAME" \
+                        -f "$WORKSPACE/$COMPOSE_FILE" \
+                        build
+
+                    echo "Docker image build completed."
                 '''
             }
         }
