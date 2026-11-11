@@ -11,6 +11,7 @@ pipeline {
         APP_NAME = 'two-tier-devops-project'
         COMPOSE_FILE = 'docker-compose.yml'
         COMPOSE_PROJECT_NAME = 'two-tier-devops-project'
+        ENV_FILE = '/opt/two-tier-devops-project/.env'
     }
 
     stages {
@@ -18,7 +19,10 @@ pipeline {
         stage('Checkout') {
             steps {
                 echo 'Source code checked out by Jenkins.'
-                sh 'git status --short --branch'
+
+                sh '''
+                    git status --short --branch
+                '''
             }
         }
 
@@ -57,13 +61,31 @@ pipeline {
                 sh '''
                     set -e
 
-                    echo "Checking Docker version..."
-                    docker --version
-                    docker compose version
+                    echo "Checking environment file..."
+
+
+                    if [ ! -f "$ENV_FILE" ]; then
+                        echo "ERROR: Jenkins cannot read the environment file."
+                        exit 1
+                    fi
+
+                    echo "Validating Docker Compose configuration..."
+
+                    docker compose \
+                        --env-file "$ENV_FILE" \
+                        -p "$COMPOSE_PROJECT_NAME" \
+                        -f "$WORKSPACE/$COMPOSE_FILE" \
+                        config --quiet
 
                     echo "Building Docker images..."
-                    docker compose -p ${COMPOSE_PROJECT_NAME} \
-                        -f ${COMPOSE_FILE} build
+		    
+		    docker compose \
+                        --env-file "$ENV_FILE" \
+       		        -p "$COMPOSE_PROJECT_NAME" \
+                	-f "$WORKSPACE/$COMPOSE_FILE" \
+                	build
+		    echo "Docker image build completed."
+
                 '''
             }
         }
@@ -73,26 +95,27 @@ pipeline {
                 sh '''
                     set -e
 
-                    echo "Checking environment configuration..."
+                    echo "Checking environment file..."
 
-                    if [ ! -f /opt/two-tier-devops-project/.env ]; then
-                        echo "ERROR: Deployment .env file is missing."
+                    if [ ! -f "$ENV_FILE" ]; then
+                        echo "ERROR: Jenkins cannot read the environment file."
                         exit 1
                     fi
 
                     echo "Deploying application..."
 
                     docker compose \
-                        --env-file /opt/two-tier-devops-project/.env \
-                        -p ${COMPOSE_PROJECT_NAME} \
-                        -f ${WORKSPACE}/${COMPOSE_FILE} \
-                        up -d
+                        --env-file "$ENV_FILE" \
+                        -p "$COMPOSE_PROJECT_NAME" \
+                        -f "$WORKSPACE/$COMPOSE_FILE" \
+                        up -d build
 
                     echo "Checking running containers..."
+
                     docker compose \
-                        --env-file /opt/two-tier-devops-project/.env \
-                        -p ${COMPOSE_PROJECT_NAME} \
-                        -f ${WORKSPACE}/${COMPOSE_FILE} \
+                        --env-file "$ENV_FILE" \
+                        -p "$COMPOSE_PROJECT_NAME" \
+                        -f "$WORKSPACE/$COMPOSE_FILE" \
                         ps
                 '''
             }
@@ -108,7 +131,9 @@ pipeline {
 
                     echo "Checking application health..."
 
-                    curl --fail --retry 5 --retry-delay 5 \
+                    curl --fail \
+                        --retry 5 \
+                        --retry-delay 5 \
                         --retry-connrefused \
                         http://localhost:5000/health
 
@@ -116,7 +141,9 @@ pipeline {
 
                     echo "Checking database health..."
 
-                    curl --fail --retry 5 --retry-delay 5 \
+                    curl --fail \
+                        --retry 5 \
+                        --retry-delay 5 \
                         --retry-connrefused \
                         http://localhost:5000/db-health
 
